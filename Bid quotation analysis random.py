@@ -8,6 +8,7 @@ matplotlib.use('Agg')  # 避免GUI警告
 import warnings
 warnings.filterwarnings('ignore')
 import os
+import time
 
 font_path = os.path.join(os.path.dirname(__file__), "NotoSerifCJKsc-Regular.otf")
 myfont = fm.FontProperties(fname=font_path)
