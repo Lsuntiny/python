@@ -9,7 +9,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-myfont = fm.FontProperties(fname="NotoSansSC-Regular.otf")
+font_path = os.path.join(os.path.dirname(__file__), "NotoSansSC-Regular.otf")
+myfont = fm.FontProperties(fname=font_path)
+
 
 # 确保负号显示正常
 matplotlib.rcParams['axes.unicode_minus'] = False
