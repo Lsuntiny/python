@@ -186,7 +186,7 @@ def calculate_optimal_bid(x, y, d1, d2):
 def plot_results(df, optimal_bid, x, y, d1, d2):
     """绘制结果图表"""
     # 设置中文字体
-    print("✅ 成功加载中文字体:", font_path)
+    st.write("✅ 成功加载中文字体:", font_path)
     time.sleep(2)  # 暂停2秒
     plt.rcParams['font.sans-serif'] = [myfont.get_name()]
     plt.rcParams['axes.unicode_minus'] = False
