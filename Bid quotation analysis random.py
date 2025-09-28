@@ -194,7 +194,7 @@ def calculate_optimal_bid(x, y, d1, d2):
 def plot_results(df, optimal_bid, x, y, d1, d2):
     """绘制结果图表"""
     # 设置中文字体
-    plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
+    plt.rcParams['font.sans-serif'] = ['Noto Sans CJK SC', 'DejaVu Sans']
     plt.rcParams['axes.unicode_minus'] = False
     
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
