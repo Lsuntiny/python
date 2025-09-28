@@ -11,7 +11,6 @@ import os
 import time
 
 
-fm.fontManager.addfont("NotoSansSC-Regular.otf") 
 
 font_path = os.path.join(os.path.dirname(__file__), "NotoSansSC-Regular.otf")
 myfont = fm.FontProperties(fname=font_path)
