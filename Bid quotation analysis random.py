@@ -3,9 +3,28 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.font_manager as fm
 matplotlib.use('Agg')  # 避免GUI警告
 import warnings
 warnings.filterwarnings('ignore')
+
+
+# 常见的中文字体候选
+zh_fonts = ["SimHei", "Microsoft YaHei", "Noto Sans CJK SC", "STHeiti", "Arial Unicode MS"]
+
+# 遍历系统字体，找到第一个可用的中文字体
+available_fonts = set(f.name for f in fm.fontManager.ttflist)
+for f in zh_fonts:
+    if f in available_fonts:
+        matplotlib.rcParams['font.sans-serif'] = [f]
+        print(f"使用字体: {f}")
+        break
+else:
+    print("未找到常见中文字体，中文可能无法正常显示。")
+
+# 确保负号显示正常
+matplotlib.rcParams['axes.unicode_minus'] = False
+
 
 # 设置页面配置（必须在所有Streamlit命令之前）
 st.set_page_config(
