@@ -7,7 +7,7 @@ import matplotlib.font_manager as fm
 matplotlib.use('Agg')  # 避免GUI警告
 import warnings
 warnings.filterwarnings('ignore')
-
+import os
 
 font_path = os.path.join(os.path.dirname(__file__), "NotoSansSC-Regular.otf")
 myfont = fm.FontProperties(fname=font_path)
