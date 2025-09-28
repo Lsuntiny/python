@@ -9,16 +9,8 @@ import warnings
 warnings.filterwarnings('ignore')
 import os
 
-def plot_results(...):
-    # 字体路径：放在和脚本同目录下
-    font_path = os.path.join(os.path.dirname(__file__), "NotoSansSC-Regular.otf")
-    
-    if os.path.exists(font_path):
-        myfont = fm.FontProperties(fname=font_path)
-    else:
-        myfont = None
-        print("⚠️ 未找到 NotoSansSC-Regular.otf，中文可能显示为方框")
-
+font_path = os.path.join(os.path.dirname(__file__), "NotoSansSC-Regular.otf")
+myfont = fm.FontProperties(fname=font_path)
 
 # 确保负号显示正常
 matplotlib.rcParams['axes.unicode_minus'] = False
@@ -192,7 +184,7 @@ def calculate_optimal_bid(x, y, d1, d2):
 def plot_results(df, optimal_bid, x, y, d1, d2):
     """绘制结果图表"""
     # 设置中文字体
-    plt.rcParams['font.sans-serif'] = myfont
+    plt.rcParams['font.sans-serif'] = [myfont.get_name()]
     plt.rcParams['axes.unicode_minus'] = False
     
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
