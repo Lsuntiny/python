@@ -9,7 +9,7 @@ import warnings
 warnings.filterwarnings('ignore')
 import os
 
-font_path = os.path.join(os.path.dirname(__file__), "NotoSansSC-Regular.otf")
+font_path = os.path.join(os.path.dirname(__file__), "NotoSerifCJKsc-Regular")
 myfont = fm.FontProperties(fname=font_path)
 
 
