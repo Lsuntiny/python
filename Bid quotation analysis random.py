@@ -10,7 +10,7 @@ warnings.filterwarnings('ignore')
 import os
 import time
 
-font_path = os.path.join(os.path.dirname(__file__), "NotoSerifCJKsc-Regular.otf")
+font_path = os.path.join(os.path.dirname(__file__), "NotoSansSC-Regular.otf")
 myfont = fm.FontProperties(fname=font_path)
 
 
