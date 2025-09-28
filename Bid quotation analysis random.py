@@ -11,6 +11,7 @@ import os
 
 font_path = os.path.join(os.path.dirname(__file__), "NotoSerifCJKsc-Regular.otf")
 myfont = fm.FontProperties(fname=font_path)
+print("✅ 成功加载中文字体:", font_path)
 
 # 确保负号显示正常
 matplotlib.rcParams['axes.unicode_minus'] = False
