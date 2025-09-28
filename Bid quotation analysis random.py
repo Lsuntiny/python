@@ -10,8 +10,8 @@ warnings.filterwarnings('ignore')
 import os
 import time
 
-# 重新生成字体缓存（Linux 容器常用）
-matplotlib.font_manager._rebuild()
+
+fm.fontManager.addfont("NotoSansSC-Regular.otf") 
 
 font_path = os.path.join(os.path.dirname(__file__), "NotoSansSC-Regular.otf")
 myfont = fm.FontProperties(fname=font_path)
