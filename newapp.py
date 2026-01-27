@@ -3,160 +3,157 @@ import pandas as pd
 import numpy as np
 import random
 import plotly.graph_objects as go
+import time
 
-# --- 页面配置 ---
-st.set_page_config(layout="wide", page_title="投标博弈全概率决策系统")
-
-# --- 核心算法函数库 ---
+# --- 1. 核心评标算法：严格适配招标文件 ---
 
 def calculate_score(my_price, base_price, E1=1.5, E2=1.0):
-    """计算得分：高于基准价扣分多(E1)，低于基准价扣分少(E2)"""
-    if base_price == 0: return 0
-    deviation = (my_price - base_price) / base_price
-    score = 100 - deviation * 100 * E1 if my_price > base_price else 100 + deviation * 100 * E2
-    return max(0.0, round(score, 4))
+    """偏差率保留9位，分值保留2位"""
+    if base_price <= 0: return 0
+    deviation = round((my_price - base_price) / base_price, 9)
+    if my_price > base_price:
+        score = 100.0 - deviation * 100 * E1
+    else:
+        score = 100.0 + deviation * 100 * E2
+    return max(0.0, round(score, 2))
 
-def get_base_price_by_method(method_idx, all_bids, N):
-    """根据随机抽取的办法索引，计算基准价"""
-    all_bids = sorted(all_bids)
-    M = int(N / 5)
-    n1, n2 = random.randint(1, M) if N >= 6 else 0, random.randint(1, M) if N >= 6 else 0
-    valid_bids = all_bids[n2 : N-n1] if (n1+n2) < N else all_bids
+def get_base_price_by_method(method_idx, my_price, others, N):
+    """按照招标文件描述计算基准价"""
+    all_bids = sorted(others + [my_price])
     
-    if method_idx == 1: # 二次平均
-        avg1 = np.mean(valid_bids)
-        second_list = [x for x in valid_bids if x <= avg1]
-        p = np.mean(second_list) if second_list else avg1
-    elif method_idx == 2: # 随机平均
-        p = np.mean(random.sample(valid_bids, min(3, len(valid_bids))))
-    elif method_idx == 3: # 随机权重
-        K = (random.randint(0, 4) + random.randint(0, 9)/10) / 10
-        p = all_bids[min(max(0, N-n1-1), len(all_bids)-1)] * K + np.mean(valid_bids) * (1 - K)
-    elif method_idx == 4: # 随机步距
-        a, Z = random.choice([3, 4, 5]), random.choice([0.96, 0.97, 0.98, 0.99])
-        p = np.mean(valid_bids[::a]) * Z
-    elif method_idx == 5: # 随机低价
-        m = random.randint(int(N*0.2), int(N*0.7))
-        p = all_bids[min(max(0, m), len(all_bids)-1)]
+    # 方法 1, 2, 3, 4 执行 n1, n2 剔除
+    if method_idx <= 4:
+        if N < 6:
+            n1, n2 = 0, 0
+        else:
+            M = int(N / 5)
+            n1, n2 = random.randint(1, M), random.randint(1, M)
+        
+        valid_bids = all_bids[n2 : N-n1] # 参与计算的其余评标价
+        
+        if method_idx == 1: # 二次平均法
+            avg1 = np.mean(valid_bids)
+            second_list = [x for x in valid_bids if x <= avg1]
+            p = np.mean(second_list) if second_list else avg1
+            
+        elif method_idx == 2: # 随机平均法
+            p = np.mean(random.sample(valid_bids, 3)) if len(valid_bids) >= 3 else np.mean(valid_bids)
+            
+        elif method_idx == 3: # 随机权重法
+            A = all_bids[N-n1-1] # 去掉n1个最高后的最大值
+            B = np.mean(valid_bids)
+            X, Y = random.choice([0,1,2,3,4]), random.choice(range(10))
+            K = (X + Y/10) / 10
+            p = A * K + B * (1 - K)
+            
+        elif method_idx == 4: # 随机步距法
+            if N < 8: return np.mean(valid_bids)
+            a = random.choice([3, 4, 5])
+            Z = random.choice([0.96, 0.97, 0.98, 0.99])
+            sampled = [valid_bids[i] for i in range(0, len(valid_bids), a)]
+            p = np.mean(sampled) * Z
+            
+    else: # 方法 5：随机低价法 (独立逻辑)
+        if N < 8: return np.mean(all_bids)
+        n3, n4 = int(N * 0.2), int(N * 0.7)
+        m = random.randint(n3, n4)
+        p = all_bids[m] # 去掉m个最低后的最低价
+        
     return round(p, 2)
 
-# --- Streamlit 界面 ---
+# --- 2. 界面与交互 ---
 
-st.title("🛡️ 投标全概率决策专家系统")
-st.markdown("""
-本系统模拟现场**随机抽取一种办法**进行评标的情况。
-- **综合得分（均值）**：代表该价格在所有可能情况下的平均分数。数值**越大**越好。
-- **风险值（波动）**：代表得分的不稳定性。数值**越小**越稳。
-- **推荐指数**：结合了得分和风险的最终评价指标。数值**越大**代表综合决策价值越高。
-""")
+st.title("🛡️ 投标决策全概率全量演化系统")
 
 with st.sidebar:
-    st.header("⚙️ 1. 输入初始参数")
+    st.header("⚙️ 参数配置")
     limit_p = st.number_input("招标最高限价", value=10000.0)
-    n_count = st.number_input("投标单位家数(N)", value=30)
-    init_cost = st.number_input("企业初始成本价", value=8000.0)
-    init_high = st.number_input("初始理性最高价", value=9000.0)
+    n_count = st.number_input("单位数量(N)", value=30)
+    init_low = st.number_input("成本价", value=8200.0)
+    init_high = st.number_input("初始理性高限", value=9200.0)
     
-    st.header("⚙️ 2. 模拟设置")
-    evolve_rounds = st.slider("演化轮数 (逐步锁定范围)", 1, 15, 5)
-    risk_weight = st.slider("风险厌恶权重 (越大则越避开波动点)", 0.0, 2.0, 0.5)
-    scan_step = st.number_input("初始扫描步长", value=10.0)
+    st.divider()
+    st.header("🧪 模拟控制")
+    step_val = st.selectbox("扫描步长", [10.0, 5.0, 2.0, 1.0, 0.5], index=2)
+    evolve_rounds = st.slider("演化轮数", 1, 10, 5)
+    sample_size = st.slider("全概率采样数", 50, 500, 150)
+    risk_lambda = st.slider("风险权重系数", 0.0, 2.0, 0.8)
     
-    run_btn = st.button("🚀 启动深度演化模拟")
+    run_btn = st.button("🚀 启动全概率深度模拟")
 
 if run_btn:
-    curr_low, curr_high = init_cost, init_high
-    evolution_log = []
-    
+    curr_l, curr_h = init_low, init_high
+    history = []
+    total_sim_count = 0
+    start_time = time.time()
     progress_bar = st.progress(0)
     
-    # --- 演化主循环 ---
+    # 演化主循环
     for r in range(evolve_rounds):
-        # 建立当前区间的扫描阵列
-        prices = np.arange(curr_low, curr_high + 0.1, max(0.1, scan_step))
-        round_results = []
+        # 根据当前区间生成步长阵列
+        prices = np.arange(curr_l, curr_h + 0.01, step_val)
+        round_data = []
         
         for p_test in prices:
             scores = []
-            # 对每个测试点进行 100 次全概率模拟（抽随机办法）
-            for _ in range(100):
-                m_random = random.choice([1, 2, 3, 4, 5]) # 现场随机抽签模拟
-                others = [random.uniform(curr_low, curr_high) for _ in range(n_count-1)]
-                bp = get_base_price_by_method(m_random, others + [p_test], n_count)
+            # 全概率采样：模拟 150 次开标，办法和参数全随机
+            for _ in range(sample_size):
+                m_idx = random.choice([1, 2, 3, 4, 5])
+                # 竞争对手报价在当前博弈区间内随机分布
+                others = [random.uniform(curr_l, curr_h) for _ in range(n_count-1)]
+                bp = get_base_price_by_method(m_idx, p_test, others, n_count)
                 scores.append(calculate_score(p_test, bp))
+                total_sim_count += 1
             
-            avg_s = np.mean(scores)
-            std_s = np.std(scores)
-            # 计算推荐指数（适应度）：得分越高、波动越小，指数越高
-            fitness = avg_s - (risk_weight * std_s)
-            
-            round_results.append({"price": p_test, "avg": avg_s, "std": std_s, "fitness": fitness})
+            avg_s, std_s = np.mean(scores), np.std(scores)
+            round_data.append({"p": p_test, "avg": avg_s, "std": std_s, "fit": avg_s - risk_lambda * std_s})
         
-        # 寻找本轮推荐指数最高的价格点
-        best_entry = max(round_results, key=lambda x: x['fitness'])
-        best_p = best_entry['price']
+        # 提取本轮双策略点
+        agg = max(round_data, key=lambda x: x['avg']) # 纯分值最高
+        rob = max(round_data, key=lambda x: x['fit']) # 稳健性最高
         
-        # 记录本轮数据
-        evolution_log.append({
-            "轮次": r + 1,
-            "推荐报价": round(best_p, 2),
-            "综合得分(均值)": round(best_entry['avg'], 2),
-            "风险值(波动)": round(best_entry['std'], 2),
-            "推荐指数(综合)": round(best_entry['fitness'], 2),
-            "下限": round(curr_low, 2),
-            "上限": round(curr_high, 2)
+        history.append({
+            "轮次": r+1,
+            "激进报价方案": agg['p'], "激进下浮率": f"{(1-agg['p']/limit_p)*100:.3f}%", "激进风险": round(agg['std'], 3), "激进均分": round(agg['avg'], 2),
+            "稳健报价方案": rob['p'], "稳健下浮率": f"{(1-rob['p']/limit_p)*100:.3f}%", "稳健风险": round(rob['std'], 3), "稳健均分": round(rob['avg'], 2),
+            "L": curr_l, "H": curr_h
         })
         
-        # --- 演化边界更新逻辑 ---
-        # 下一轮的范围基于本轮最佳报价进行合理缩减
-        width = (curr_high - curr_low) * 0.3
-        curr_low = max(init_cost, best_p - width/2)
-        curr_high = min(init_high, best_p + width/2)
-        # 步长随轮次微调，越往后越精细
-        scan_step = max(0.1, scan_step * 0.7)
-        
-        progress_bar.progress((r + 1) / evolve_rounds)
+        # 边界收敛逻辑：以稳健报价方案为中心收缩搜索区间
+        margin = (curr_h - curr_l) * 0.35
+        curr_l = max(init_low, rob['p'] - margin)
+        curr_h = min(init_high, rob['p'] + margin)
+        progress_bar.progress((r+1)/evolve_rounds)
 
-    # --- 结果展示与分析 ---
-    df = pd.DataFrame(evolution_log)
+    df = pd.DataFrame(history)
     
-    c1, c2 = st.columns([1, 2])
+    # --- 3. 结果标示 ---
+    st.info(f"📊 统计：全概率模拟总计计算 **{total_sim_count:,}** 次 | 耗时 **{time.time()-start_time:.2f}** 秒")
+
+    c1, c2 = st.columns(2)
     with c1:
-        st.subheader("📋 决策演化报表")
-        st.dataframe(df.iloc[:, :-2]) # 隐藏上限下限列，保持整洁
-        
-        st.metric("最终黄金报价", f"{best_p:.2f}", f"下浮率 {round((1-best_p/limit_p)*100, 2)}%")
-        st.warning(f"最终风险波动为 {df.iloc[-1]['风险值(波动)']} (数值越小代表开标现场越平稳)")
+        st.subheader("🚩 激进方案（期望得分最高）")
+        st.metric("方案数值", f"{df.iloc[-1]['激进报价方案']:.2f}", f"下浮 {df.iloc[-1]['激进下浮率']}")
+        st.write(f"全概率预期得分：{df.iloc[-1]['激进均分']}")
+        st.write(f"风险波动：{df.iloc[-1]['激进风险']}")
 
     with c2:
-        st.subheader("📈 报价收敛与决策安全区")
-        fig = go.Figure()
-        
-        # 绘制主报价演化线
-        fig.add_trace(go.Scatter(x=df['轮次'], y=df['推荐报价'], name="推荐报价点", 
-                                 line=dict(color='green', width=4), mode='lines+markers'))
-        
-        # 绘制演化边界阴影
-        fig.add_trace(go.Scatter(x=df['轮次'], y=df['上限'], line=dict(width=0), showlegend=False))
-        fig.add_trace(go.Scatter(x=df['轮次'], y=df['下限'], line=dict(width=0), 
-                                 fill='tonexty', fillcolor='rgba(0, 255, 0, 0.1)', name='博弈平衡区'))
-        
-        fig.update_layout(xaxis_title="演化轮次", yaxis_title="报价金额")
-        st.plotly_chart(fig, use_container_width=True)
+        st.subheader("🛡️ 稳健方案（系统综合推荐）")
+        st.metric("方案数值", f"{df.iloc[-1]['稳健报价方案']:.2f}", f"下浮 {df.iloc[-1]['稳健下浮率']}", delta_color="inverse")
+        st.write(f"全概率预期得分：{df.iloc[-1]['稳健均分']}")
+        st.write(f"受控风险：{df.iloc[-1]['稳健风险']}")
 
-    # 深度风险分析
+    # --- 4. 可视化图表 ---
     st.divider()
-    st.subheader("🎯 最终轮次风险敏感度分布")
-    st.markdown("该图展示了在最终区间内，不同报价对应的得分期望值及风险下浮动量。")
+    st.subheader("📈 策略演化收敛轨迹")
     
-    sens_df = pd.DataFrame(round_results)
-    fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=sens_df['price'], y=sens_df['avg'], name="综合得分均值", line=dict(color='blue')))
-    fig2.add_trace(go.Scatter(x=sens_df['price'], y=sens_df['avg'] - sens_df['std'], 
-                              name="风险波动下限", line=dict(dash='dot', color='red')))
-    
-    fig2.update_layout(xaxis_title="候选报价", yaxis_title="得分", hovermode="x unified")
-    st.plotly_chart(fig2, use_container_width=True)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df['轮次'], y=df['激进报价方案'], name="激进轨迹", line=dict(color='red', dash='dash')))
+    fig.add_trace(go.Scatter(x=df['轮次'], y=df['稳健报价方案'], name="稳健轨迹", line=dict(color='green', width=4)))
+    fig.add_trace(go.Scatter(x=df['轮次'], y=df['H'], line=dict(width=0), showlegend=False))
+    fig.add_trace(go.Scatter(x=df['轮次'], y=df['L'], line=dict(width=0), fill='tonexty', fillcolor='rgba(0,255,0,0.05)', name='搜索范围'))
+    fig.update_layout(xaxis_title="演化轮次", yaxis_title="报价数值", hovermode="x unified")
+    st.plotly_chart(fig, use_container_width=True)
 
-else:
-    st.info("👈 请在左侧配置参数，并点击【启动深度演化模拟】开始寻找黄金报价。")
+    st.subheader("📊 详细演化数据表")
+    st.table(df.drop(columns=['L', 'H']))
